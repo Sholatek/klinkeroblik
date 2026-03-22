@@ -50,10 +50,7 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             return
         context.user_data["info"] = info
 
-    if action == "work":
-        from handlers.work_entry import start_work_entry
-        await start_work_entry(update, context)
-    elif action == "reports":
+    if action == "reports":
         from handlers.reports import show_reports_menu
         await show_reports_menu(update, context)
     elif action == "brigades":
@@ -74,4 +71,4 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 def get_menu_handler():
-    return CallbackQueryHandler(menu_callback, pattern=r"^menu:")
+    return CallbackQueryHandler(menu_callback, pattern=r"^menu:(?!work$)")
