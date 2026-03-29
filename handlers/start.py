@@ -98,11 +98,26 @@ async def lang_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     lang = query.data.split(":")[1]
     context.user_data["lang"] = lang
 
-    await query.edit_message_text(
-        text=t(lang, "welcome").split("\n")[0],
-        reply_markup=role_keyboard(lang)
-    )
-    return ROLE
+    # Check if any director exists
+    async with async_session() as session:
+        from sqlalchemy import func
+        result = await session.execute(select(func.count(Director.id)))
+        director_count = result.scalar()
+
+    if director_count == 0:
+        # No director yet — allow director registration
+        await query.edit_message_text(
+            text=t(lang, "welcome").split("\n")[0],
+            reply_markup=role_keyboard(lang)
+        )
+        return ROLE
+    else:
+        # Director exists — only invite code
+        context.user_data["reg_role"] = "join"
+        await query.edit_message_text(
+            text=t(lang, "registration.enter_invite_code"),
+        )
+        return INVITE_CODE
 
 
 async def role_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

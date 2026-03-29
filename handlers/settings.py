@@ -44,7 +44,7 @@ async def show_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     lang_name = t(lang, "lang_name")
     curr = user.currency if info["role"] == "director" else "PLN"
 
-    text = t(lang, "settings.current", lang=lang_name, currency=curr)
+    text = t(lang, "settings.current", language=lang_name, currency=curr)
 
     if update.callback_query:
         await update.callback_query.edit_message_text(
@@ -79,7 +79,7 @@ async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     query = update.callback_query
     await query.answer()
     info = context.user_data["info"]
-    new_lang = query.data.split(":")[2]
+    new_lang = query.data.split(":")[1]
 
     async with async_session() as session:
         if info["role"] == "director":
@@ -129,7 +129,7 @@ async def currency_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     await query.answer()
     info = context.user_data["info"]
     lang = info["lang"]
-    new_currency = query.data.split(":")[2]
+    new_currency = query.data.split(":")[1]
 
     async with async_session() as session:
         result = await session.execute(

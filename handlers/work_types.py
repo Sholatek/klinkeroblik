@@ -9,7 +9,7 @@ from telegram.ext import (
 from sqlalchemy import select
 
 from database import async_session
-from models import WorkType
+from models import WorkType, Director
 from utils.i18n import t, unit_label, currency_symbol
 from utils.permissions import get_user_info
 
@@ -75,28 +75,47 @@ async def add_work_type_start(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.answer()
     info = context.user_data["info"]
     lang = info["lang"]
-    await query.edit_message_text(t(lang, "work_types_menu.enter_name_uk"))
+    await query.edit_message_text(
+        t(lang, "work_types_menu.enter_name_uk"),
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton(t(lang, "btn.cancel"), callback_data="wt:cancel")]
+        ])
+    )
     return WT_ADD_NAME_UK
 
 
 async def add_name_uk(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["wt_name_uk"] = update.message.text.strip()
-    await update.message.reply_text(t(context.user_data["lang"], "work_types_menu.enter_name_pl"))
+    lang = context.user_data["info"]["lang"]
+    await update.message.reply_text(
+        t(lang, "work_types_menu.enter_name_pl"),
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton(t(lang, "btn.cancel"), callback_data="wt:cancel")]
+        ])
+    )
     return WT_ADD_NAME_PL
 
 
 async def add_name_pl(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["wt_name_pl"] = update.message.text.strip()
-    await update.message.reply_text(t(context.user_data["lang"], "work_types_menu.enter_name_ru"))
+    lang = context.user_data["info"]["lang"]
+    await update.message.reply_text(
+        t(lang, "work_types_menu.enter_name_ru"),
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton(t(lang, "btn.cancel"), callback_data="wt:cancel")]
+        ])
+    )
     return WT_ADD_NAME_RU
 
 
 async def add_name_ru(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["wt_name_ru"] = update.message.text.strip()
+    lang = context.user_data["info"]["lang"]
     buttons = [[InlineKeyboardButton(f"{u[0]} — {u[1]}", callback_data=f"wt:unit:{u[0]}")]
                for u in UNITS]
+    buttons.append([InlineKeyboardButton(t(lang, "btn.cancel"), callback_data="wt:cancel")])
     await update.message.reply_text(
-        t(context.user_data["lang"], "work_types_menu.select_unit"),
+        t(lang, "work_types_menu.select_unit"),
         reply_markup=InlineKeyboardMarkup(buttons)
     )
     return WT_ADD_UNIT
@@ -106,8 +125,13 @@ async def add_unit_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     query = update.callback_query
     await query.answer()
     context.user_data["wt_unit"] = query.data.split(":")[2]
-    lang = context.user_data["lang"]
-    await query.edit_message_text(t(lang, "work_types_menu.enter_rate"))
+    lang = context.user_data["info"]["lang"]
+    await query.edit_message_text(
+        t(lang, "work_types_menu.enter_rate"),
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton(t(lang, "btn.cancel"), callback_data="wt:cancel")]
+        ])
+    )
     return WT_ADD_RATE
 
 
@@ -150,10 +174,40 @@ async def add_rate_entered(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     return ConversationHandler.END
 
 
+async def deactivate_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Ask confirmation before deactivating a work type."""
+    query = update.callback_query
+    await query.answer()
+    info = context.user_data.get("info") or await get_user_info(update.effective_user.id)
+    if not info:
+        return
+    context.user_data["info"] = info
+    lang = info["lang"]
+    wt_id = int(query.data.split(":")[2])
+
+    async with async_session() as session:
+        result = await session.execute(select(WorkType).where(WorkType.id == wt_id))
+        wt = result.scalar_one()
+        name = wt.get_name(lang)
+
+    await query.edit_message_text(
+        t(lang, "work_types_menu.confirm_delete", name=name),
+        reply_markup=InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(t(lang, "btn.confirm"), callback_data=f"wt:del_yes:{wt_id}"),
+                InlineKeyboardButton(t(lang, "btn.cancel"), callback_data="wt:del_no"),
+            ]
+        ])
+    )
+
+
 async def deactivate_work_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
-    info = context.user_data["info"]
+    info = context.user_data.get("info") or await get_user_info(update.effective_user.id)
+    if not info:
+        return
+    context.user_data["info"] = info
     lang = info["lang"]
     wt_id = int(query.data.split(":")[2])
 
@@ -168,21 +222,34 @@ async def deactivate_work_type(update: Update, context: ContextTypes.DEFAULT_TYP
     await show_work_types_menu(update, context)
 
 
+async def deactivate_cancelled(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.callback_query.answer()
+    await show_work_types_menu(update, context)
+
+
+async def add_wt_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await show_work_types_menu(update, context)
+    return ConversationHandler.END
+
+
 def get_work_types_handlers():
+    cancel_handler = CallbackQueryHandler(add_wt_cancel, pattern=r"^wt:cancel$")
     add_conv = ConversationHandler(
         entry_points=[CallbackQueryHandler(add_work_type_start, pattern=r"^wt:add$")],
         states={
-            WT_ADD_NAME_UK: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_name_uk)],
-            WT_ADD_NAME_PL: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_name_pl)],
-            WT_ADD_NAME_RU: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_name_ru)],
-            WT_ADD_UNIT: [CallbackQueryHandler(add_unit_selected, pattern=r"^wt:unit:")],
-            WT_ADD_RATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_rate_entered)],
+            WT_ADD_NAME_UK: [cancel_handler, MessageHandler(filters.TEXT & ~filters.COMMAND, add_name_uk)],
+            WT_ADD_NAME_PL: [cancel_handler, MessageHandler(filters.TEXT & ~filters.COMMAND, add_name_pl)],
+            WT_ADD_NAME_RU: [cancel_handler, MessageHandler(filters.TEXT & ~filters.COMMAND, add_name_ru)],
+            WT_ADD_UNIT: [cancel_handler, CallbackQueryHandler(add_unit_selected, pattern=r"^wt:unit:")],
+            WT_ADD_RATE: [cancel_handler, MessageHandler(filters.TEXT & ~filters.COMMAND, add_rate_entered)],
         },
-        fallbacks=[],
+        fallbacks=[cancel_handler],
         per_message=False,
     )
 
     return [
         add_conv,
-        CallbackQueryHandler(deactivate_work_type, pattern=r"^wt:deactivate:\d+$"),
+        CallbackQueryHandler(deactivate_confirm, pattern=r"^wt:deactivate:\d+$"),
+        CallbackQueryHandler(deactivate_work_type, pattern=r"^wt:del_yes:\d+$"),
+        CallbackQueryHandler(deactivate_cancelled, pattern=r"^wt:del_no$"),
     ]

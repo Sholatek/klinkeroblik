@@ -68,6 +68,9 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     elif action == "settings":
         from handlers.settings import show_settings
         await show_settings(update, context)
+    elif action == "clients":
+        from handlers.clients import show_clients_menu
+        await show_clients_menu(update, context)
 
 
 def get_menu_handler():

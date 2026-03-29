@@ -16,6 +16,7 @@ from handlers.brigades import get_brigades_handlers
 from handlers.projects import get_projects_handlers
 from handlers.rates import get_rates_handlers
 from handlers.work_types import get_work_types_handlers
+from handlers.clients import get_clients_handlers
 from handlers.settings import get_settings_handlers
 from handlers.work_entry import get_work_entry_handler
 
@@ -82,6 +83,8 @@ def main():
     for handler in get_rates_handlers():
         application.add_handler(handler)
     for handler in get_work_types_handlers():
+        application.add_handler(handler)
+    for handler in get_clients_handlers():
         application.add_handler(handler)
     for handler in get_settings_handlers():
         application.add_handler(handler)

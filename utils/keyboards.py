@@ -23,11 +23,13 @@ def main_menu_keyboard(lang: str, role: str) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(t(lang, "menu.reports"), callback_data="menu:reports")],
     ]
     if role in ("director", "brigadier"):
-        buttons.append([InlineKeyboardButton(t(lang, "menu.brigades"), callback_data="menu:brigades")])
+        brigade_key = "menu.brigade" if role == "brigadier" else "menu.brigades"
+        buttons.append([InlineKeyboardButton(t(lang, brigade_key), callback_data="menu:brigades")])
         buttons.append([InlineKeyboardButton(t(lang, "menu.projects"), callback_data="menu:projects")])
     if role == "director":
         buttons.append([InlineKeyboardButton(t(lang, "menu.rates"), callback_data="menu:rates")])
         buttons.append([InlineKeyboardButton(t(lang, "menu.work_types"), callback_data="menu:work_types")])
+        buttons.append([InlineKeyboardButton(t(lang, "menu.clients"), callback_data="menu:clients")])
     buttons.append([InlineKeyboardButton(t(lang, "menu.settings"), callback_data="menu:settings")])
     return InlineKeyboardMarkup(buttons)
 

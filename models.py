@@ -28,8 +28,26 @@ class Director(Base):
     brigades: Mapped[list["Brigade"]] = relationship(back_populates="director")
     workers: Mapped[list["Worker"]] = relationship(back_populates="director")
     projects: Mapped[list["Project"]] = relationship(back_populates="director")
+    clients: Mapped[list["Client"]] = relationship(back_populates="director")
     work_types: Mapped[list["WorkType"]] = relationship(back_populates="director")
     invite_codes: Mapped[list["InviteCode"]] = relationship(back_populates="director")
+
+
+class Client(Base):
+    """Contractor/customer entity."""
+    __tablename__ = "clients"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    director_id: Mapped[int] = mapped_column(ForeignKey("directors.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(50))
+    email: Mapped[str | None] = mapped_column(String(255))
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    director: Mapped["Director"] = relationship(back_populates="clients")
+    projects: Mapped[list["Project"]] = relationship(back_populates="client")
 
 
 class Brigade(Base):
@@ -102,13 +120,16 @@ class Project(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     director_id: Mapped[int] = mapped_column(ForeignKey("directors.id"), nullable=False)
+    client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     address: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
 
     director: Mapped["Director"] = relationship(back_populates="projects")
+    client: Mapped["Client"] = relationship(back_populates="projects")
     buildings: Mapped[list["Building"]] = relationship(back_populates="project")
     project_rates: Mapped[list["ProjectRate"]] = relationship(back_populates="project")
 
@@ -172,6 +193,36 @@ class ProjectRate(Base):
 
     project: Mapped["Project"] = relationship(back_populates="project_rates")
     work_type: Mapped["WorkType"] = relationship(back_populates="project_rates")
+
+
+class BrigadeRate(Base):
+    """Rate override for a brigade (applies to all projects unless overridden)."""
+    __tablename__ = "brigade_rates"
+    __table_args__ = (UniqueConstraint("brigade_id", "work_type_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    brigade_id: Mapped[int] = mapped_column(ForeignKey("brigades.id"), nullable=False)
+    work_type_id: Mapped[int] = mapped_column(ForeignKey("work_types.id"), nullable=False)
+    rate: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+
+    brigade: Mapped["Brigade"] = relationship()
+    work_type: Mapped["WorkType"] = relationship()
+
+
+class BrigadeProjectRate(Base):
+    """Rate override for a specific brigade on a specific project (highest priority)."""
+    __tablename__ = "brigade_project_rates"
+    __table_args__ = (UniqueConstraint("brigade_id", "project_id", "work_type_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    brigade_id: Mapped[int] = mapped_column(ForeignKey("brigades.id"), nullable=False)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    work_type_id: Mapped[int] = mapped_column(ForeignKey("work_types.id"), nullable=False)
+    rate: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+
+    brigade: Mapped["Brigade"] = relationship()
+    project: Mapped["Project"] = relationship()
+    work_type: Mapped["WorkType"] = relationship()
 
 
 class WorkEntry(Base):
